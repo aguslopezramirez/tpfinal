@@ -1,0 +1,29 @@
+  SYNOPS de 87007, La Quiaca Observatorio (Argentina) | 22-06S | 065-36W | 3462 m 
+              (1)
+  ################################################################################
+ 201102281800 AAXX 28183 87007 32565 43202 10174 20023 
+                      ## #####              ####  ####  
+      (2)     (3)   (4)   (5)   (6)   (7)   (8)   (9) 
+36733 47132 57016 84100 333 56700 84820=
+ ####
+(10)  (11)  (12)  (13) (14) (15)  (16)   
+
+### Datos que estan en todas las estaciones:
+    
+(2)# 2011-02-28 -> Dia     180 -> Hora utc redondeada   0 -> indica que el viento esta medido en m/s
+
+(3)# AAXX -> es un synop de una estacion terrestre
+   
+(4)# 2 -> incluye datos de precipitacion      8 -> no se que es     1 ->altura de la estacion entre 50m y 99m    83 -> visibilidad horizontal de 45km
+   
+(5)# 8 -> total de cielo nublado en octavos   70 -> direccion del viento en decenas de grados(aca serian 200°)  07 -> vel del viento en nudos (107 nudoa)
+   
+(8)# 1 ->esta siempre   0 -> la temperatura es positiva    174 ->la t es de 17,4 grados
+ 
+(9)# 2 ->esta siempre   0 -> la temp de rocio es positiva     023 -> la de td es 2,3 grados
+ 
+(10)# 3 -> esta siempre  6733 -> la precion a nivel de la estacion es 673,3 hpa NO SE SI ESTA BIEN
+ 
+ 
+ 
+
