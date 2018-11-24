@@ -5,12 +5,13 @@ archivo<-here("SYNOP.dat")
 
 #leo los datos de cada estacion por un lado y los datos de cada variable por otro para ponerlos "lindos" y juntarlos
 
-data.estaciones<-read.table(archivo, header = FALSE, sep = "|", fill = TRUE, na.strings = "", skip =26,
-                 comment.char = "")
+data.estaciones<-read.table(archivo, header = FALSE, sep = "|", dec = "-", fill = TRUE, na.strings = "", skip =26,
+                            comment.char = "")
 
 data<-read.table(archivo, header = FALSE, sep = "=", fill = TRUE, skip =26, colClasses = c("character","character"),
                  comment.char = "#")
 
+#na.strings para que tome los espacios vacios como NA
 #header=FALSE para que no considere que la primer fila es el encabezado
 #fill=TRUE para que complete con espacios en blanco
 #colClasses para que considere que las columnas son de clase character
@@ -51,11 +52,133 @@ synops<-synops[rowSums(is.na(synops)) != ncol(synops),]          #uso esta sente
 
 
 #########DATA.ESTACIONES##########
+#voy a extraer n° de estacion, localidad, latitud y longitud
 
 estacion<-data.estaciones[rowSums(is.na(data.estaciones)) == 0,]   #con esta sentencia elimino las lineas vacias y las que contengan algun NA
 
 
 
+#numero de estacion y localidad
+
+num.est<-substr(estacion$V1,14,18)
+
+localidad<-substr(estacion$V1,21,100000)
+
+
+#latitud
+#substraigo los datos y los pongo en formato numerico
+  
+lat<-substr(estacion$V2,2,6)
+lat<-as.numeric(sub("-",".",lat))   
+
+#lat<-format(as.numeric(sub("-",".",lat)), digits = 4)         #COMO HAGO PARA QUE NO ME REDONDEE!!!!!!!!!!
+#options(digits = 4)
+#lat<-as.numeric(format(sub("-",".",substr(estacion$V2,2,6))), digits = 4)
+
+
+#longitud
+#hago lo mismo que con la latitud
+
+lon<-substr(estacion$V3,3,7)
+lon<-as.numeric(sub("-",".",lon))
+lon<-360-lon
+
+###### DECODIFICACION #######
+#Ahora voy a indexar los datos de nubosidad, viento, temperatura,
+#temperatura de roció y presión en cada estación junto con su decodificacion
+#pero primero voy a sacar los datos que no me sirven del data frame synops (numero de estacion, dia y hora, etc)
+
+#en la estacion del aerodromo de formosa tengo que el dato de n° de estacion esta repetido. Lo saco.
+synops$t.presente[10]<-sub(" 87162 87162 "," 87162 ",synops$t.presente[10])
+
+#ahora si me quedo solo con los datos que me importan
+
+synops$t.presente<-substr(synops$t.presente,36,100000)
+
+###viento 
+
+viento<-substr(synops$t.presente,3,6)
+
+#decodificacion -- Nddff N:nubosidad  dd:direccion  ff:velocidad
+
+dd<-(as.numeric(substr(viento,1,2)))*10 #porque el viento esta en decenas de grados
+ff<-as.numeric(substr(viento,3,4))      #en m/s
+
+#voy a sacar los valores de viento de mi data.frame para que no molesten
+
+synops$t.presente<-substr(synops$t.presente,7,100000)
+
+###temperatura
+
+t<-substr(synops$t.presente, regexpr(" 1", synops$t.presente)+1,regexpr(" 1", synops$t.presente)+5)
+
+#Decodificacion -- 1STTT S:signo de la t  TTT: t en grados centigrados y con un decimal
+
+TTT<-(as.numeric(substr(t,3,5)))*0.1  #en °C
+
+#aca le estoy diciendo que guarde en t los datos de temperatura substrayendolos y convirtiendolos en numericos
+#porque los extrae como caracter
+#son los 5 numeros que comienzan con 1
+#regexpr busca en el synop el patron "espacio1" y me devuelve la posicion en el que lo encontro
+
+###temperatura de rocio
+
+td<-substr(synops$t.presente, regexpr(" 2", synops$t.presente)+1,regexpr(" 2", synops$t.presente)+5)
+
+#decodificacion -- 2STdTdTd  S:signo  TdTdTd: td en grados centigrados con un decimal
+
+S<-as.numeric(substr(td,2,2))    #dos estaciones tienen td negativas
+S[S==1]<-(-1)
+S[S==0]<-1
+Td<-(as.numeric(substr(td,3,5)))*0.1*S
+
+#presion a nivel de la estacion
+
+p<-substr(synops$t.presente, regexpr(" 3", synops$t.presente)+1,regexpr(" 3", synops$t.presente)+5)
+
+#decodificacion -- 3PPPP  PPPP: p en hectopascales sin el mil y con un decimal
+
+P<-(as.numeric(substr(p,2,5)))*0.1
+P[which(P <100)]<-P[which(P < 100)]+1000
+
+
+###nubosidad
+
+nub<-substr(synops$t.presente, regexpr(" 8", synops$t.presente)+1,regexpr(" 8", synops$t.presente)+5)
+nub[which(nchar(nub) != 5)]<-NA     #algunas estaciones no tienen datos de nubosidad
+
+#decodificacion -- 8NClCmCh  N:cantidad en octavos  Cl,Cm y Ch tipos de nubes
+
+N<-as.numeric(substr(nub,2,2))
+
+Cl<-as.numeric(substr(nub,3,3))
+Cl[which(Cl == 0)]<-"No hay estratocúmulos, estratos, cúmulos o cumulonimbus"
+Cl[which(Cl == 1)]<-"Cúmulos con aspecto plano, o cúmulos por mal tiempo, antes o despues de las precipitaciones"
+Cl[which(Cl == 2)]<-"Cúmulos de extensión vertical fuerte o moderada con protuberancias tipo torres, acompañados o no por otros cúmulos o estratocúmulos"
+Cl[which(Cl == 3)]<-"Cumulonimbus cuya parte superior no tiene perfil puntiagudo y que no son fibrosos ni con forma de yunque"
+Cl[which(Cl == 4)]<-"Estratocúmulos formados por el desarrollo de cúmulos"
+Cl[which(Cl == 5)]<-"Estratocúmulos que no surgen del desarrollo de cúmulos"
+Cl[which(Cl == 7)]<-"Estratos ''fractus'' de mal tiempo"
+Cl[which(Cl == 8)]<-"Otros cúmulos y estratocúmulos formados por el desarrollo de cúmulos"
+
+Cm<-as.numeric(substr(nub,4,4))
+Cm[which(Cm == 0)]<-"No hay altocúmulos, altoestratos o nimboestratos"
+Cm[which(Cm == 1)]<-"Altoestartos en gran parte semitransparentes"
+Cm[which(Cm == 3)]<-"Altoscúmulos en gran parte semitransparente"
+Cm[which(Cm == 5)]<-"Altocúmulos en bandas semitransparentes, o altocúmulos en una o más láminas semitransparentes u opacas"
+Cm[which(Cm == 6)]<-"Altocúmulos resultantes del desarrollo de cúmulos o cumulonimbos"
+Cm[which(Cm == 7)]<-"Altocúmulos en dos o más láminas, generalmente opacas en algunos lugares"
+
+Ch<-as.numeric(substr(nub,5,5))
+Ch[which(Ch == 0)]<-"No hay cirros, cirrocúmulos ni cirroestratos"
+Ch[which(Ch == 1)]<-"Cirros en forma de filamentos o hebras"
+Ch[which(Ch == 2)]<-"Cirros densos como manchas que parecen ser restos de la parte superior de un cumulonimbo"
+Ch[which(Ch == 3)]<-"Cirros con forma de yunque"
+Ch[which(Ch == 6)]<-"Cirros en forma de bandas que convergen hacia dos puntos opuestos del horizonte"
+Ch[which(Ch == 8)]<-"Cirroestratos que no cubren la bóveda celeste"
+  
+#Para los datos de temperatura maxima y minima en las 12 hs previas y precipitacion en las 24 hs previas
+#hago lo mismo pero con los datos en la columna t.pasado del data frame
 
 
 
