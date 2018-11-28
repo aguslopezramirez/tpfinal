@@ -1,5 +1,7 @@
 rm(list = ls())
 require("here")
+require("ggplot2")
+require("maps")
 
 archivo<-here("SYNOP.dat")
 
@@ -40,10 +42,10 @@ for (i in 1:109) {
 
 synops<-data.frame(t.presente,t.pasado, stringsAsFactors = FALSE)     #stringAsFactors porque no quiero que convierta los vectores en factores
 
-synops<-synops[rowSums(is.na(synops)) != ncol(synops),]          #uso esta sentencia para eliminar las lineas con NA
+synops<-synops[rowSums(is.na(synops)) != ncol(synops),]               #uso esta sentencia para eliminar las lineas con NA
 
 #rowSum hace la suma de cada fila
-#i.na(synops) me da true para NA y false para cualquier otra cosa
+#is.na(synops) me da true para NA y false para cualquier otra cosa
 #si una linea me da true true y hago la suma esta me da 2 que es igual a ncol(synops)
 #entonces no se queda con esa linea
 
@@ -62,19 +64,14 @@ estacion<-data.estaciones[rowSums(is.na(data.estaciones)) == 0,]   #con esta sen
 
 num.est<-substr(estacion$V1,14,18)
 
-localidad<-substr(estacion$V1,21,100000)
+localidad<-substr(estacion$V1,21,regexpr("Arg", estacion$V1)-3)
 
 
 #latitud
 #substraigo los datos y los pongo en formato numerico
   
 lat<-substr(estacion$V2,2,6)
-lat<-as.numeric(sub("-",".",lat))   
-
-#lat<-format(as.numeric(sub("-",".",lat)), digits = 4)         #COMO HAGO PARA QUE NO ME REDONDEE!!!!!!!!!!
-#options(digits = 4)
-#lat<-as.numeric(format(sub("-",".",substr(estacion$V2,2,6))), digits = 4)
-
+lat<-as.numeric(sub("-",".",lat))*-1   
 
 #longitud
 #hago lo mismo que con la latitud
@@ -84,7 +81,7 @@ lon<-as.numeric(sub("-",".",lon))
 lon<-360-lon
 
 ###### DECODIFICACION #######
-#Ahora voy a indexar los datos de nubosidad, viento, temperatura,
+#Ahora voy a obtener los datos de nubosidad, viento, temperatura,
 #temperatura de roció y presión en cada estación junto con su decodificacion
 #pero primero voy a sacar los datos que no me sirven del data frame synops (numero de estacion, dia y hora, etc)
 
@@ -101,8 +98,8 @@ viento<-substr(synops$t.presente,3,6)
 
 #decodificacion -- Nddff N:nubosidad  dd:direccion  ff:velocidad
 
-dd<-(as.numeric(substr(viento,1,2)))*10 #porque el viento esta en decenas de grados
-ff<-as.numeric(substr(viento,3,4))      #en m/s
+dd<-(as.numeric(substr(viento,1,2)))*10  #porque el viento esta en decenas de grados
+ff<-as.numeric(substr(viento,3,4))      
 
 #voy a sacar los valores de viento de mi data.frame para que no molesten
 
@@ -112,13 +109,12 @@ synops$t.presente<-substr(synops$t.presente,7,100000)
 
 t<-substr(synops$t.presente, regexpr(" 1", synops$t.presente)+1,regexpr(" 1", synops$t.presente)+5)
 
-#Decodificacion -- 1STTT S:signo de la t  TTT: t en grados centigrados y con un decimal
+#decodificacion -- 1STTT S:signo de la t  TTT: t en grados centigrados y con un decimal
 
-TTT<-(as.numeric(substr(t,3,5)))*0.1  #en °C
+TTT<-(as.numeric(substr(t,3,5)))*0.1  
 
 #aca le estoy diciendo que guarde en t los datos de temperatura substrayendolos y convirtiendolos en numericos
 #porque los extrae como caracter
-#son los 5 numeros que comienzan con 1
 #regexpr busca en el synop el patron "espacio1" y me devuelve la posicion en el que lo encontro
 
 ###temperatura de rocio
@@ -132,7 +128,7 @@ S[S==1]<-(-1)
 S[S==0]<-1
 Td<-(as.numeric(substr(td,3,5)))*0.1*S
 
-#presion a nivel de la estacion
+###presion a nivel de la estacion
 
 p<-substr(synops$t.presente, regexpr(" 3", synops$t.presente)+1,regexpr(" 3", synops$t.presente)+5)
 
@@ -145,11 +141,12 @@ P[which(P <100)]<-P[which(P < 100)]+1000
 ###nubosidad
 
 nub<-substr(synops$t.presente, regexpr(" 8", synops$t.presente)+1,regexpr(" 8", synops$t.presente)+5)
-nub[which(nchar(nub) != 5)]<-NA     #algunas estaciones no tienen datos de nubosidad
+nub[which(nchar(nub) != 5)]<-NA    #algunas estaciones no tienen datos de nubosidad
 
 #decodificacion -- 8NClCmCh  N:cantidad en octavos  Cl,Cm y Ch tipos de nubes
 
-N<-as.numeric(substr(nub,2,2))
+N<-substr(nub,2,2)
+
 
 Cl<-as.numeric(substr(nub,3,3))
 Cl[which(Cl == 0)]<-"No hay estratocúmulos, estratos, cúmulos o cumulonimbus"
@@ -177,8 +174,48 @@ Ch[which(Ch == 3)]<-"Cirros con forma de yunque"
 Ch[which(Ch == 6)]<-"Cirros en forma de bandas que convergen hacia dos puntos opuestos del horizonte"
 Ch[which(Ch == 8)]<-"Cirroestratos que no cubren la bóveda celeste"
   
-#Para los datos de temperatura maxima y minima en las 12 hs previas y precipitacion en las 24 hs previas
-#hago lo mismo pero con los datos en la columna t.pasado del data frame
+#No se encuentran datos de temperatura maxima y minima en las 12hs previas y de precipitacion en las 24hs previas
+#para ninguna estacion.
 
 
+####PARTE B####
 
+#Pongo todas las variables en un data frame
+
+decod<-data.frame(Id = num.est, Latitud = lat, Longitud = lon, Direccion = dd, Velocidad = ff, Temperatura = TTT, TemperaturaRocio = Td, Presion = P, Nubosidad = N, Baja = Cl, Media = Cm, Alta = Ch , stringsAsFactors = FALSE)
+decod[is.na(decod)] <- -999.99
+
+file.create("Decodificacion.txt")
+
+write.table(decod, file = "Decodificacion.txt", sep = " ", dec = ".", quote = FALSE, row.names = FALSE)
+
+
+####PARTE C
+
+cant.estaciones<-length(num.est)
+faltantes <- vector("numeric", length = 5)
+
+for(f in 1:5) {
+  faltantes[f]<-length(which(decod[[f+4]] == -999.99))
+}
+
+print(paste("Se procesaron",cant.estaciones,"estaciones en total y se encontraron",faltantes[1],"datos faltantes de viento,",faltantes[2],"datos faltantes de temperatura,", faltantes[3], "datos faltantes de temperatura de rocio,", faltantes[4], "datos faltantes de pesion y", faltantes[5], "datos faltantes de nubosidad."))
+
+
+####PARTE D
+
+mapa<-map_data("world2", region = "Argentina")
+num<-1:length(localidad)
+df<-data.frame(latitudes = lat, longitudes = lon, num = num, localidad = paste(num,localidad), stringsAsFactors = FALSE)
+
+m <- ggplot() +
+  theme_bw() + 
+  geom_polygon(data = mapa, aes(x=long, y=lat, group =group),color="black", fill="grey") +
+  geom_point(data = df, aes(x=longitudes, y=latitudes, fill = localidad), color="purple", size=2.5) +
+  geom_text(data = df, aes(longitudes, latitudes, label= num), size=4)  +
+  ggtitle("Posición de las estaciones procesadas") +
+  xlab("Longitud") +
+  ylab("Latitud")
+
+ 
+ggsave("posicion_estaciones.png", width = 17, height = 10, dpi = 300)
